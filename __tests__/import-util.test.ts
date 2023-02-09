@@ -83,7 +83,7 @@ function importUtilTests(transform: (code: string) => string) {
     expect(code).toMatch(/import \{ thing as thing0 \} from ['"]m['"]/);
   });
 
-  test('uses an existing import', () => {
+  test('uses an existing named import', () => {
     let code = transform(`
       import { thing } from 'm';
       export default function() {
@@ -91,6 +91,28 @@ function importUtilTests(transform: (code: string) => string) {
       }
       `);
     expect(runDefault(code, { dependencies })).toEqual('you said: foo.');
+    expect(code.match(/import/g)?.length).toEqual(1);
+  });
+
+  test('uses an existing namespace import', () => {
+    let code = transform(`
+      import * as m from 'm';
+      export default function() {
+        return myNamespaceTarget.thing('foo');
+      }
+      `);
+    expect(runDefault(code, { dependencies })).toEqual('you said: foo.');
+    expect(code.match(/import/g)?.length).toEqual(1);
+  });
+
+  test('uses an existing default import', () => {
+    let code = transform(`
+      import say from 'm';
+      export default function() {
+        return myDefaultTarget('foo');
+      }
+      `);
+    expect(runDefault(code, { dependencies })).toEqual('default said: foo.');
     expect(code.match(/import/g)?.length).toEqual(1);
   });
 
@@ -104,6 +126,44 @@ function importUtilTests(transform: (code: string) => string) {
     expect(runDefault(code, { dependencies })).toEqual('you said: foo.');
     expect(code.match(/import/g)?.length).toEqual(1);
     expect(code).toMatch(/import \{ other, thing \} from ['"]m['"]/);
+  });
+
+  test('adds a default import to an existing import', () => {
+    let code = transform(`
+      import { other } from 'm';
+      export default function() {
+        return myDefaultTarget('foo');
+      }
+      `);
+    expect(runDefault(code, { dependencies })).toEqual('default said: foo.');
+    expect(code.match(/import/g)?.length).toEqual(1);
+    expect(code).toMatch(/import myDefaultTarget, \{ other \} from ['"]m['"]/);
+  });
+
+  test('creates a new import statement for a namespace import', () => {
+    let code = transform(`
+      import { other } from 'm';
+      export default function() {
+        return myNamespaceTarget.default('foo');
+      }
+      `);
+    expect(runDefault(code, { dependencies })).toEqual('default said: foo.');
+    expect(code.match(/import/g)?.length).toEqual(2);
+    expect(code).toMatch(/import \* as myNamespaceTarget from ['"]m['"]/);
+    expect(code).toMatch(/import \{ other \} from ['"]m['"]/);
+  });
+
+  test('creates a new import statement when the existing one is a namespace import', () => {
+    let code = transform(`
+      import * as m from 'm';
+      export default function() {
+        return myTarget('foo');
+      }
+      `);
+    expect(runDefault(code, { dependencies })).toEqual('you said: foo.');
+    expect(code.match(/import/g)?.length).toEqual(2);
+    expect(code).toMatch(/import \* as m from ['"]m['"]/);
+    expect(code).toMatch(/import \{ thing \} from ['"]m['"]/);
   });
 
   test('subsequent imports avoid previously created bindings', () => {
